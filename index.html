@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Quote Training Tool — OnlineComponents.com</title>
-
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root {
   --navy:#1a3a5c; --navy-dark:#122a44; --navy-mid:#1e4575;
@@ -125,17 +125,17 @@ table.hist th{background:var(--navy);color:white}
           <button class="btn btn-outline btn-lg" onclick="document.getElementById('catalogFile').click()" style="flex-direction:column;justify-content:center;padding:20px;gap:4px;width:100%">
             <span style="font-size:28px">📂</span>
             <span>Upload Catalog</span>
-            <span style="font-size:11px;opacity:0.7;font-weight:400">CSV from MERP</span>
+            <span style="font-size:11px;opacity:0.7;font-weight:400">CSV or Excel from MERP</span>
           </button>
         </div>
-        <input type="file" id="catalogFile" accept=".csv" style="display:none" onchange="handleCatalogUpload(event)" />
+        <input type="file" id="catalogFile" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleCatalogUpload(event)" />
         <div id="catalogStatus"></div>
         <div id="uploadHint" style="display:none;margin-top:12px">
           <div class="alert alert-info">Required columns: Part Number, List Price. Optional: Description, Manufacturer, Category, In Stock, Lead Time.</div>
           <div class="upload-area" id="uploadArea" onclick="document.getElementById('catalogFile').click()">
             <div class="upload-icon">📂</div>
             <p><strong>Click to upload</strong> or drag &amp; drop</p>
-            <p class="text-muted">CSV only</p>
+            <p class="text-muted">CSV or Excel (.xlsx)</p>
           </div>
         </div>
       </div>
@@ -168,7 +168,7 @@ table.hist th{background:var(--navy);color:white}
     <div class="mode-card" onclick="showScreen('screenPartLookup')">
       <div class="mode-icon">🔍</div>
       <div class="mode-title">Specific Part</div>
-      <div class="mode-desc">Search for a specific part number to practice</div>
+      <div class="mode-desc">Enter any part number and list price to practice</div>
     </div>
     <div class="mode-card" onclick="showManagerReview()">
       <div class="mode-icon">📊</div>
@@ -186,16 +186,39 @@ table.hist th{background:var(--navy);color:white}
   </div>
 </div>
 
-<!-- SCREEN 3: PART LOOKUP -->
+<!-- SCREEN 3: SPECIFIC PART CHALLENGE -->
 <div id="screenPartLookup" class="hidden">
   <button class="btn btn-secondary mb-16" onclick="showScreen('screenMode')">← Back to Menu</button>
   <div class="card">
-    <div class="card-header">Search Parts</div>
+    <div class="card-header">Enter Part — Specific Challenge</div>
     <div class="card-body">
-      <input type="text" id="partLookupInput" class="form-control" placeholder="Search part number, description, or manufacturer..." oninput="renderPartLookup()" />
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="form-group">
+          <label>Part Number <span style="color:var(--red)">*</span></label>
+          <input type="text" id="customPartNumber" class="form-control" placeholder="e.g. LM358DR2G" style="font-size:15px;font-family:monospace;text-transform:uppercase" oninput="this.value=this.value.toUpperCase()" />
+        </div>
+        <div class="form-group">
+          <label>List Price (per unit) <span style="color:var(--red)">*</span></label>
+          <input type="number" id="customListPrice" class="form-control" placeholder="0.0000" step="0.0001" min="0" />
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="form-group">
+          <label>Manufacturer <span class="text-muted">(optional)</span></label>
+          <input type="text" id="customManufacturer" class="form-control" placeholder="e.g. Texas Instruments" />
+        </div>
+        <div class="form-group">
+          <label>Our Stock on Hand <span class="text-muted">(optional — affects scoring)</span></label>
+          <input type="number" id="customStock" class="form-control" placeholder="Leave blank if unknown" min="0" />
+        </div>
+      </div>
+      <div class="alert alert-info" style="margin-bottom:16px">
+        💡 Don't know the list price? <a href="https://www.trustedparts.com" target="_blank" style="color:var(--navy);font-weight:700">Look it up on TrustedParts ↗</a> — search the part and use the authorized distributor price.
+      </div>
+      <div id="customPartError"></div>
+      <button class="btn btn-primary btn-lg" onclick="startCustomPartChallenge()">🎯 Start Challenge</button>
     </div>
   </div>
-  <div id="partLookupResults"></div>
 </div>
 
 <!-- SCREEN 4: CHALLENGE -->
@@ -489,7 +512,7 @@ function handleCatalogUpload(evt) {
     try {
       let rows;
       if (file.name.toLowerCase().endsWith('.csv')) rows = parseCSV(e.target.result);
-      else { document.getElementById('catalogStatus').innerHTML = '<div class="alert alert-warning">⚠️ Please upload a CSV file (Excel not supported here).</div>'; return; }
+      else { const wb = XLSX.read(new Uint8Array(e.target.result),{type:'array'}); rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''}); }
       const parts = parseCatalog(rows);
       if (!parts) { document.getElementById('catalogStatus').innerHTML = '<div class="alert alert-danger">❌ Could not find Part Number and List Price columns.</div>'; return; }
       if (!parts.length) { document.getElementById('catalogStatus').innerHTML = '<div class="alert alert-warning">⚠️ No valid parts found.</div>'; return; }
@@ -498,7 +521,7 @@ function handleCatalogUpload(evt) {
       document.getElementById('btnStart').disabled = !document.getElementById('repNameInput').value.trim();
     } catch(err) { document.getElementById('catalogStatus').innerHTML = '<div class="alert alert-danger">❌ ' + err.message + '</div>'; }
   };
-  if (file.name.toLowerCase().endsWith('.csv')) reader.readAsText(file); else { document.getElementById('catalogStatus').innerHTML = '<div class="alert alert-warning">⚠️ Please upload a CSV file (Excel not supported here).</div>'; return; }
+  if (file.name.toLowerCase().endsWith('.csv')) reader.readAsText(file); else reader.readAsArrayBuffer(file);
 }
 function parseCatalog(data) {
   if (!data || data.length < 2) return [];
@@ -568,9 +591,40 @@ function startRandomChallenge() {
   renderChallenge();
   showScreen('screenChallenge');
 }
-function startSpecificChallenge(partNumber) {
-  const part = state.catalog.find(p => p.partNumber === partNumber);
-  if (!part) { alert('Part not found.'); return; }
+
+/* ── CUSTOM PART CHALLENGE ── */
+function startCustomPartChallenge() {
+  const pn = (document.getElementById('customPartNumber').value||'').trim();
+  const lp = parseFloat(document.getElementById('customListPrice').value);
+  const mfr = (document.getElementById('customManufacturer').value||'').trim();
+  const stockVal = document.getElementById('customStock').value;
+  const stock = stockVal !== '' ? (parseInt(stockVal)||0) : null;
+  const errEl = document.getElementById('customPartError');
+  errEl.innerHTML = '';
+  if (!pn) { errEl.innerHTML='<div class="alert alert-danger">Please enter a part number.</div>'; return; }
+  if (isNaN(lp)||lp<=0) { errEl.innerHTML='<div class="alert alert-danger">Please enter a valid list price.</div>'; return; }
+
+  // Check catalog for matching part; if found, override with entered values
+  const catalogPart = state.catalog.find(p => p.partNumber.toUpperCase() === pn.toUpperCase());
+  let part;
+  if (catalogPart) {
+    part = Object.assign({}, catalogPart);
+    part.listPrice = lp;
+    if (stock !== null) part.inStock = stock;
+    if (mfr) part.manufacturer = mfr;
+  } else {
+    part = {
+      partNumber: pn,
+      description: '',
+      manufacturer: mfr,
+      listPrice: lp,
+      inStock: stock !== null ? stock : 0,
+      leadTime: '',
+      category: '',
+      notes: stock === null ? '⚠ Stock not provided — stock scoring assumes 0 on hand.' : ''
+    };
+  }
+
   state.currentChallenge = generateChallenge(part);
   renderChallenge();
   showScreen('screenChallenge');
@@ -730,7 +784,7 @@ function submitCannotQuote() {
   else { rPts=15; rMsg='Reason selected. Verify it matches the actual situation.'; }
   score += rPts;
 
-  // MOQ proposal (30pts) — only scored when reason is below_moq
+  // MOQ proposal (30pts)
   let mPts = 0, mMsg = '';
   if (reason === 'below_moq') {
     if (!moqQty) { mPts=0; mMsg='❌ No MOQ qty entered. Always specify what qty you can offer.'; flags.push({type:'red',msg:'🚨 Missing: no MOQ quantity offered to customer.'}); }
@@ -860,7 +914,7 @@ function scoreQuote(ch) {
   let stockPts, stockMsg;
   if (weHaveStock) { stockPts=quotedPrice>=p.listPrice*0.85?15:quotedPrice>=p.listPrice*0.70?10:5; stockMsg=stockPts===15?'We have stock — maintained strong pricing. Leveraged supply correctly.':stockPts===10?'We have stock but discounted moderately. Some leverage given up.':'We have stock and discounted heavily. Did not protect supply advantage.'; }
   else if (weHavePartialStock) { stockPts=quotedPrice>=p.listPrice*0.80?12:7; stockMsg=stockPts===12?'Partial stock ('+p.inStock.toLocaleString()+' of '+qty.toLocaleString()+' needed) — good pricing discipline. Factory order needed for balance.':'Partial stock — discounted more than necessary given supply advantage on initial quantity.'; }
-  else { const hasNegligible = p.inStock > 0 && (p.inStock / qty) < 0.25; stockPts=quotedPrice<=p.listPrice?12:15; stockMsg=(stockPts===15?'No meaningful stock ('+p.inStock.toLocaleString()+' on hand vs '+qty.toLocaleString()+' needed) — priced above list. Confirm premium is appropriate.':'No meaningful stock ('+p.inStock.toLocaleString()+' on hand vs '+qty.toLocaleString()+' needed) — priced at/below list. Must factory order. Pricing is market-appropriate.'); }
+  else { stockPts=quotedPrice<=p.listPrice?12:15; stockMsg=(stockPts===15?'No meaningful stock ('+p.inStock.toLocaleString()+' on hand vs '+qty.toLocaleString()+' needed) — priced above list. Confirm premium is appropriate.':'No meaningful stock ('+p.inStock.toLocaleString()+' on hand vs '+qty.toLocaleString()+' needed) — priced at/below list. Must factory order. Pricing is market-appropriate.'); }
 
   // 4. Discount Off List (10pts)
   let discPts, discMsg;
@@ -938,7 +992,7 @@ function scoreQuote(ch) {
   else recReason='Based on list price and GP targets. Verify with TrustedParts before finalizing.';
 
   const coaching = generateCoaching(ch,{gpPct,discountPct,total,grade,sizeCategory,weHaveStock,compHasStock,compNoStock,compPrice,targetPrice,noteWords,gpPts,compPts,stockPts});
-  const customerNote = 'Thank you for the opportunity to quote on <strong>'+p.partNumber+'</strong> ('+p.description+').<br><br>We are pleased to offer <strong>'+ch.qty.toLocaleString()+' pcs</strong> at <strong>'+fmt(quotedPrice)+'</strong>/unit — total: <strong>'+fmt(quotedPrice*qty)+'</strong>.<br><br>'+(weHaveStock?'We have '+p.inStock.toLocaleString()+' units available for immediate shipment.':'Lead time is '+(p.leadTime||'subject to confirmation')+'.')+'<br><br>This pricing reflects current market conditions. Please reach out with any questions.';
+  const customerNote = 'Thank you for the opportunity to quote on <strong>'+p.partNumber+'</strong>'+(p.description?' ('+p.description+')':'')+'.<br><br>We are pleased to offer <strong>'+ch.qty.toLocaleString()+' pcs</strong> at <strong>'+fmt(quotedPrice)+'</strong>/unit — total: <strong>'+fmt(quotedPrice*qty)+'</strong>.<br><br>'+(weHaveStock?'We have '+p.inStock.toLocaleString()+' units available for immediate shipment.':'Lead time is '+(p.leadTime||'subject to confirmation')+'.')+'<br><br>This pricing reflects current market conditions. Please reach out with any questions.';
   return {gpPct,gpDollars,totalValue,discountPct,gpPts,compPts,stockPts,discPts,valuePts,targetPts,notesPts,gpMsg,compMsg,stockMsg,discMsg,valueMsg,targetMsg,notesMsg,total,grade,passFail,flags,conservative,competitive,aggressive,recGP,conGP,aggGP,recReason,coaching,customerNote,sizeCategory,weHaveStock,weHavePartialStock,compHasStock,compNoStock};
 }
 
@@ -1023,19 +1077,6 @@ function startManagerReview() {
   html+='</tbody></table></div></div>';
   document.getElementById('managerContent').innerHTML=html;
   showScreen('screenManager');
-}
-
-/* ── PART LOOKUP ── */
-function renderPartLookup() {
-  const q=document.getElementById('partLookupInput').value.trim().toLowerCase();
-  const el=document.getElementById('partLookupResults');
-  if(!q||q.length<2){el.innerHTML='';return;}
-  const matches=state.catalog.filter(p=>p.partNumber.toLowerCase().includes(q)||(p.description||'').toLowerCase().includes(q)||(p.manufacturer||'').toLowerCase().includes(q)).slice(0,20);
-  if(!matches.length){el.innerHTML='<div class="alert alert-info">No parts found matching "'+q+'".</div>';return;}
-  el.innerHTML='<div style="display:grid;gap:8px">'+matches.map(p=>{
-    const moq=getMOQ(p);
-    return '<div style="background:white;border:1px solid var(--border);border-radius:6px;padding:12px;display:flex;justify-content:space-between;align-items:center"><div><div style="font-weight:700;color:var(--navy)">'+p.partNumber+'</div><div style="font-size:12px;color:var(--gray)">'+p.manufacturer+' · '+(p.description||'')+'</div><div style="font-size:11px;margin-top:3px">Stock: '+(p.inStock>0?'<span style="color:var(--green)">'+p.inStock.toLocaleString()+'</span>':'<span style="color:var(--red)">None</span>')+' · MOQ: '+moq.toLocaleString()+' · LT: '+(p.leadTime||'N/A')+'</div></div><div style="text-align:right"><div style="font-size:18px;font-weight:900;font-family:monospace;color:var(--navy)">'+fmt(p.listPrice)+'</div><button class="btn btn-sm btn-primary" style="margin-top:6px" onclick="startSpecificChallenge(\''+p.partNumber+'\')">Train →</button></div></div>';
-  }).join('')+'</div>';
 }
 
 /* ── CONFIG ── */
