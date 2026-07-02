@@ -168,7 +168,7 @@ table.hist th{background:var(--navy);color:white}
     <div class="mode-card" onclick="showScreen('screenPartLookup')">
       <div class="mode-icon">🔍</div>
       <div class="mode-title">Specific Part</div>
-      <div class="mode-desc">Enter any part number and list price to practice</div>
+      <div class="mode-desc">Search for a specific part number to practice</div>
     </div>
     <div class="mode-card" onclick="showManagerReview()">
       <div class="mode-icon">📊</div>
@@ -189,34 +189,137 @@ table.hist th{background:var(--navy);color:white}
 <!-- SCREEN 3: SPECIFIC PART CHALLENGE -->
 <div id="screenPartLookup" class="hidden">
   <button class="btn btn-secondary mb-16" onclick="showScreen('screenMode')">← Back to Menu</button>
-  <div class="card">
-    <div class="card-header">Enter Part — Specific Challenge</div>
-    <div class="card-body">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-        <div class="form-group">
-          <label>Part Number <span style="color:var(--red)">*</span></label>
-          <input type="text" id="customPartNumber" class="form-control" placeholder="e.g. LM358DR2G" style="font-size:15px;font-family:monospace;text-transform:uppercase" oninput="this.value=this.value.toUpperCase()" />
+
+  <!-- Part entry — styled like challenge header -->
+  <div style="background:linear-gradient(135deg,var(--navy-dark),var(--navy-mid));color:white;padding:20px;border-radius:var(--radius);margin-bottom:16px">
+    <div style="display:grid;grid-template-columns:1fr auto;gap:20px;align-items:start;margin-bottom:16px">
+      <div>
+        <div style="font-size:11px;opacity:0.7;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Part Number *</div>
+        <input type="text" id="cpPartNumber" style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.3);border-radius:6px;color:white;font-family:monospace;font-size:20px;font-weight:900;padding:8px 12px;width:100%;outline:none" placeholder="Enter part number..." oninput="this.value=this.value.toUpperCase()" />
+      </div>
+      <div style="text-align:right;min-width:200px">
+        <div style="font-size:11px;opacity:0.7;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">List Price (per unit) *</div>
+        <input type="number" id="cpListPrice" style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.3);border-radius:6px;color:white;font-size:26px;font-weight:900;font-family:monospace;padding:8px 12px;width:100%;text-align:right;outline:none" placeholder="0.0000" step="0.0001" min="0" />
+        <div style="font-size:11px;opacity:0.65;margin-top:5px"><a href="https://www.trustedparts.com" target="_blank" style="color:rgba(255,255,255,0.85)">🔗 Look up on TrustedParts ↗</a></div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:12px;align-items:end">
+      <div>
+        <div style="font-size:11px;opacity:0.7;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Quantity *</div>
+        <input type="number" id="cpQty" style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.3);border-radius:6px;color:white;font-size:15px;font-weight:700;padding:8px 12px;width:100%;outline:none" placeholder="e.g. 500" min="1" />
+      </div>
+      <div>
+        <div style="font-size:11px;opacity:0.7;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Our Stock on Hand</div>
+        <input type="number" id="cpStock" style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.3);border-radius:6px;color:white;font-size:15px;font-weight:700;padding:8px 12px;width:100%;outline:none" placeholder="Optional" min="0" />
+      </div>
+      <div>
+        <div style="font-size:11px;opacity:0.7;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Manufacturer</div>
+        <input type="text" id="cpManufacturer" style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.3);border-radius:6px;color:white;font-size:13px;padding:8px 12px;width:100%;outline:none" placeholder="Optional" />
+      </div>
+      <div>
+        <button class="btn btn-success" style="padding:11px 22px;white-space:nowrap;font-size:14px" onclick="generateCustomScenario()">🎲 Generate Scenario</button>
+      </div>
+    </div>
+    <div id="cpError" style="margin-top:10px"></div>
+  </div>
+
+  <!-- Scenario + quote form — hidden until Generate is clicked -->
+  <div id="cpScenarioSection" style="display:none">
+    <div id="cpScenarioBox"></div>
+    <div id="cpTPPanel"></div>
+
+    <div class="card">
+      <div class="card-header">Your Quote</div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="form-group">
+            <label>Your Cost (per unit) <span style="color:var(--red)">*</span></label>
+            <input type="number" id="cpCost" class="form-control" placeholder="0.0000" step="0.0001" min="0" oninput="updateCPLiveGP()" />
+          </div>
+          <div class="form-group">
+            <label>Proposed Quote Price (per unit) <span style="color:var(--red)">*</span></label>
+            <input type="number" id="cpPrice" class="form-control" placeholder="0.0000" step="0.0001" min="0" oninput="updateCPLiveGP()" />
+          </div>
+        </div>
+        <!-- Live GP Panel -->
+        <div id="cpLiveGPPanel" style="display:none;margin-bottom:16px">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+            <div class="gp-tile" id="cpGpTileList"><div class="gp-label">GP% at List Price</div><div class="gp-val" id="cpGpListVal">—</div><div class="gp-sub" id="cpGpListSub"></div></div>
+            <div class="gp-tile" id="cpGpTileQuote"><div class="gp-label">GP% at Your Price</div><div class="gp-val" id="cpGpQuoteVal">—</div><div class="gp-sub" id="cpGpQuoteSub"></div></div>
+            <div class="gp-tile" id="cpGpTileDollars"><div class="gp-label">GP$ at Your Price</div><div class="gp-val" id="cpGpDollarsVal">—</div><div class="gp-sub" id="cpGpDollarsSub"></div></div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="form-group">
+            <label>Customer Target Price (if given)</label>
+            <input type="number" id="cpTargetPrice" class="form-control" placeholder="Leave blank if none" step="0.0001" min="0" />
+          </div>
+          <div class="form-group">
+            <label>Competitor Low Price (from TrustedParts)</label>
+            <input type="number" id="cpCompPrice" class="form-control" placeholder="Leave blank if not checked" step="0.0001" min="0" />
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="form-group">
+            <label>Competitor Stock</label>
+            <select id="cpCompStock" class="form-control">
+              <option value="unknown">Not checked</option>
+              <option value="yes">Yes — in stock</option>
+              <option value="partial">Partial stock</option>
+              <option value="no">No stock</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Competitor Source</label>
+            <input type="text" id="cpCompSource" class="form-control" placeholder="e.g. Digi-Key, Mouser, Arrow..." />
+          </div>
         </div>
         <div class="form-group">
-          <label>List Price (per unit) <span style="color:var(--red)">*</span></label>
-          <input type="number" id="customListPrice" class="form-control" placeholder="0.0000" step="0.0001" min="0" />
+          <label>Quote Strategy Notes <span class="text-muted">(explain your reasoning — graded)</span></label>
+          <textarea id="cpNotes" class="form-control" rows="3" placeholder="Why did you quote this price? What market conditions did you consider? Did you use stock leverage? How did you respond to the target price?"></textarea>
+        </div>
+        <div id="cpSubmitError" class="hidden"></div>
+        <div class="d-flex gap-8 mt-8" style="flex-wrap:wrap">
+          <button class="btn btn-success btn-lg" onclick="submitCPQuote()">✅ Submit Quote</button>
+          <button class="btn btn-warning btn-lg" onclick="showCPCannotQuote()">⚠️ Cannot Quote</button>
+        </div>
+        <!-- Cannot Quote Panel -->
+        <div class="cq-panel" id="cpCannotQuotePanel">
+          <h3 style="margin:0 0 16px;color:#b7470a;font-size:16px;font-weight:800">⚠️ Cannot Quote — Explain Your Decision</h3>
+          <div class="form-group">
+            <label>Reason <span style="color:var(--red)">*</span></label>
+            <select id="cpCqReason" class="form-control" onchange="updateCPCQFields()">
+              <option value="">Select reason...</option>
+              <option value="below_moq">Below MOQ — can offer adjusted quantity</option>
+              <option value="no_stock">No Stock — factory order required</option>
+              <option value="lead_time">Lead Time too long for customer need</option>
+              <option value="obsolete">Part Obsolete / EOL</option>
+              <option value="export">Export Controlled / Compliance issue</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div id="cpCqMoqBlock" style="display:none;background:white;border:1px solid #f0c040;border-radius:6px;padding:14px;margin-bottom:14px">
+            <div style="font-weight:700;color:#7a5500;margin-bottom:10px">📦 MOQ Adjustment</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div class="form-group" style="margin:0"><label>Proposed Qty (at MOQ)</label><input type="number" id="cpCqMoqQty" class="form-control" min="1" placeholder="e.g. 1000" /><div class="text-muted" style="margin-top:4px">Min qty you can offer</div></div>
+              <div class="form-group" style="margin:0"><label>Estimated Lead Time</label><input type="text" id="cpCqLeadTime" class="form-control" placeholder="e.g. 8–10 weeks ARO" /></div>
+            </div>
+          </div>
+          <div id="cpCqNoStockBlock" style="display:none;background:white;border:1px solid #f0c040;border-radius:6px;padding:14px;margin-bottom:14px">
+            <div style="font-weight:700;color:#7a5500;margin-bottom:10px">🏭 Factory Order</div>
+            <div class="form-group" style="margin:0"><label>Estimated Lead Time</label><input type="text" id="cpCqLeadTimeNS" class="form-control" placeholder="e.g. 12–14 weeks ARO" /></div>
+          </div>
+          <div class="form-group">
+            <label>What would you tell the customer? <span class="text-muted">(graded)</span></label>
+            <textarea id="cpCqNotes" class="form-control" rows="3" placeholder="Explain how you'd handle this — alternatives you can offer, your message to the customer, how you keep the relationship..."></textarea>
+          </div>
+          <div id="cpCqError" style="display:none;color:var(--red);margin-bottom:10px;font-size:13px"></div>
+          <div class="d-flex gap-8">
+            <button class="btn btn-primary" onclick="submitCPCannotQuote()">Submit Decision for Scoring</button>
+            <button class="btn btn-secondary" onclick="hideCPCannotQuote()">← Back to Quote Form</button>
+          </div>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-        <div class="form-group">
-          <label>Manufacturer <span class="text-muted">(optional)</span></label>
-          <input type="text" id="customManufacturer" class="form-control" placeholder="e.g. Texas Instruments" />
-        </div>
-        <div class="form-group">
-          <label>Our Stock on Hand <span class="text-muted">(optional — affects scoring)</span></label>
-          <input type="number" id="customStock" class="form-control" placeholder="Leave blank if unknown" min="0" />
-        </div>
-      </div>
-      <div class="alert alert-info" style="margin-bottom:16px">
-        💡 Don't know the list price? <a href="https://www.trustedparts.com" target="_blank" style="color:var(--navy);font-weight:700">Look it up on TrustedParts ↗</a> — search the part and use the authorized distributor price.
-      </div>
-      <div id="customPartError"></div>
-      <button class="btn btn-primary btn-lg" onclick="startCustomPartChallenge()">🎯 Start Challenge</button>
     </div>
   </div>
 </div>
@@ -591,40 +694,9 @@ function startRandomChallenge() {
   renderChallenge();
   showScreen('screenChallenge');
 }
-
-/* ── CUSTOM PART CHALLENGE ── */
-function startCustomPartChallenge() {
-  const pn = (document.getElementById('customPartNumber').value||'').trim();
-  const lp = parseFloat(document.getElementById('customListPrice').value);
-  const mfr = (document.getElementById('customManufacturer').value||'').trim();
-  const stockVal = document.getElementById('customStock').value;
-  const stock = stockVal !== '' ? (parseInt(stockVal)||0) : null;
-  const errEl = document.getElementById('customPartError');
-  errEl.innerHTML = '';
-  if (!pn) { errEl.innerHTML='<div class="alert alert-danger">Please enter a part number.</div>'; return; }
-  if (isNaN(lp)||lp<=0) { errEl.innerHTML='<div class="alert alert-danger">Please enter a valid list price.</div>'; return; }
-
-  // Check catalog for matching part; if found, override with entered values
-  const catalogPart = state.catalog.find(p => p.partNumber.toUpperCase() === pn.toUpperCase());
-  let part;
-  if (catalogPart) {
-    part = Object.assign({}, catalogPart);
-    part.listPrice = lp;
-    if (stock !== null) part.inStock = stock;
-    if (mfr) part.manufacturer = mfr;
-  } else {
-    part = {
-      partNumber: pn,
-      description: '',
-      manufacturer: mfr,
-      listPrice: lp,
-      inStock: stock !== null ? stock : 0,
-      leadTime: '',
-      category: '',
-      notes: stock === null ? '⚠ Stock not provided — stock scoring assumes 0 on hand.' : ''
-    };
-  }
-
+function startSpecificChallenge(partNumber) {
+  const part = state.catalog.find(p => p.partNumber === partNumber);
+  if (!part) { alert('Part not found.'); return; }
   state.currentChallenge = generateChallenge(part);
   renderChallenge();
   showScreen('screenChallenge');
@@ -784,7 +856,7 @@ function submitCannotQuote() {
   else { rPts=15; rMsg='Reason selected. Verify it matches the actual situation.'; }
   score += rPts;
 
-  // MOQ proposal (30pts)
+  // MOQ proposal (30pts) — only scored when reason is below_moq
   let mPts = 0, mMsg = '';
   if (reason === 'below_moq') {
     if (!moqQty) { mPts=0; mMsg='❌ No MOQ qty entered. Always specify what qty you can offer.'; flags.push({type:'red',msg:'🚨 Missing: no MOQ quantity offered to customer.'}); }
@@ -914,7 +986,7 @@ function scoreQuote(ch) {
   let stockPts, stockMsg;
   if (weHaveStock) { stockPts=quotedPrice>=p.listPrice*0.85?15:quotedPrice>=p.listPrice*0.70?10:5; stockMsg=stockPts===15?'We have stock — maintained strong pricing. Leveraged supply correctly.':stockPts===10?'We have stock but discounted moderately. Some leverage given up.':'We have stock and discounted heavily. Did not protect supply advantage.'; }
   else if (weHavePartialStock) { stockPts=quotedPrice>=p.listPrice*0.80?12:7; stockMsg=stockPts===12?'Partial stock ('+p.inStock.toLocaleString()+' of '+qty.toLocaleString()+' needed) — good pricing discipline. Factory order needed for balance.':'Partial stock — discounted more than necessary given supply advantage on initial quantity.'; }
-  else { stockPts=quotedPrice<=p.listPrice?12:15; stockMsg=(stockPts===15?'No meaningful stock ('+p.inStock.toLocaleString()+' on hand vs '+qty.toLocaleString()+' needed) — priced above list. Confirm premium is appropriate.':'No meaningful stock ('+p.inStock.toLocaleString()+' on hand vs '+qty.toLocaleString()+' needed) — priced at/below list. Must factory order. Pricing is market-appropriate.'); }
+  else { const hasNegligible = p.inStock > 0 && (p.inStock / qty) < 0.25; stockPts=quotedPrice<=p.listPrice?12:15; stockMsg=(stockPts===15?'No meaningful stock ('+p.inStock.toLocaleString()+' on hand vs '+qty.toLocaleString()+' needed) — priced above list. Confirm premium is appropriate.':'No meaningful stock ('+p.inStock.toLocaleString()+' on hand vs '+qty.toLocaleString()+' needed) — priced at/below list. Must factory order. Pricing is market-appropriate.'); }
 
   // 4. Discount Off List (10pts)
   let discPts, discMsg;
@@ -991,9 +1063,45 @@ function scoreQuote(ch) {
   else if(!weHaveStock&&compNoStock) recReason='No stock in market. Discounting doesn\'t create advantage. Protect margin.';
   else recReason='Based on list price and GP targets. Verify with TrustedParts before finalizing.';
 
+  // Specific Part mode: Fair Market / Price to Win / Aggressive (Cannot Lose)
+  let fairMarket,fairMarketGP,fairMarketReason,priceToWin,priceToWinGP,priceToWinReason,aggressiveWin,aggressiveWinGP,aggressiveWinReason;
+  if (ch.isSpecificPart) {
+    const priceForGP = gp => cost/(1-gp/100);
+    const gpAt = px => (px-cost)/px*100;
+
+    // Fair Market Price — anchored to real market data (TrustedParts) when available
+    if (compPrice) {
+      fairMarket = compPrice;
+      fairMarketReason = 'Based on the competitor price you found ('+fmt(compPrice)+(ch.compSource?' via '+ch.compSource:'')+') — this is the going market rate for this part at this quantity.';
+    } else {
+      const curve = qty<50?0.95:qty<250?0.90:qty<1000?0.85:qty<5000?0.78:0.70;
+      fairMarket = p.listPrice*curve;
+      fairMarketReason = '⚠ No competitor price entered — this is an estimated street price based on list price and quantity break. Check TrustedParts.com for actual market data before finalizing.';
+    }
+    fairMarketGP = gpAt(fairMarket);
+
+    // Price to Win — priced to actually secure the business while holding the 15% floor whenever possible
+    const targetGPPrice = priceForGP(cfg.targetGP);
+    const floorGPPrice = priceForGP(cfg.minGP);
+    const winAnchor = Math.min(fairMarket, targetPrice||Infinity) * 0.98;
+    priceToWin = Math.max(floorGPPrice, Math.min(targetGPPrice, winAnchor));
+    priceToWinGP = gpAt(priceToWin);
+    if (winAnchor >= targetGPPrice) priceToWinReason = 'Market and customer pricing support hitting our 35% GP target outright — no need to concede further to win this.';
+    else if (winAnchor > floorGPPrice) priceToWinReason = 'Positioned about 2% under the market/target price to give a real edge, while still clearing the 15% GP floor.';
+    else priceToWinReason = 'Truly winning this at market price would require dropping below our 15% floor — this holds the floor as the strongest defensible price before going aggressive.';
+
+    // Aggressive / Cannot Lose — last-resort price; may breach the 15% floor but never sells below cost
+    const loseAnchor = Math.min(fairMarket, targetPrice||Infinity) * 0.95;
+    aggressiveWin = Math.max(cost*1.01, Math.min(loseAnchor, priceToWin));
+    aggressiveWinGP = gpAt(aggressiveWin);
+    aggressiveWinReason = aggressiveWinGP < cfg.minGP
+      ? 'Dips below the 15% floor — reserve this for when winning the account is worth the thinner margin, not simply to avoid losing.'
+      : 'Even at this aggressive number, GP holds at or above the 15% floor — low-risk to go this low if needed.';
+  }
+
   const coaching = generateCoaching(ch,{gpPct,discountPct,total,grade,sizeCategory,weHaveStock,compHasStock,compNoStock,compPrice,targetPrice,noteWords,gpPts,compPts,stockPts});
-  const customerNote = 'Thank you for the opportunity to quote on <strong>'+p.partNumber+'</strong>'+(p.description?' ('+p.description+')':'')+'.<br><br>We are pleased to offer <strong>'+ch.qty.toLocaleString()+' pcs</strong> at <strong>'+fmt(quotedPrice)+'</strong>/unit — total: <strong>'+fmt(quotedPrice*qty)+'</strong>.<br><br>'+(weHaveStock?'We have '+p.inStock.toLocaleString()+' units available for immediate shipment.':'Lead time is '+(p.leadTime||'subject to confirmation')+'.')+'<br><br>This pricing reflects current market conditions. Please reach out with any questions.';
-  return {gpPct,gpDollars,totalValue,discountPct,gpPts,compPts,stockPts,discPts,valuePts,targetPts,notesPts,gpMsg,compMsg,stockMsg,discMsg,valueMsg,targetMsg,notesMsg,total,grade,passFail,flags,conservative,competitive,aggressive,recGP,conGP,aggGP,recReason,coaching,customerNote,sizeCategory,weHaveStock,weHavePartialStock,compHasStock,compNoStock};
+  const customerNote = 'Thank you for the opportunity to quote on <strong>'+p.partNumber+'</strong> ('+p.description+').<br><br>We are pleased to offer <strong>'+ch.qty.toLocaleString()+' pcs</strong> at <strong>'+fmt(quotedPrice)+'</strong>/unit — total: <strong>'+fmt(quotedPrice*qty)+'</strong>.<br><br>'+(weHaveStock?'We have '+p.inStock.toLocaleString()+' units available for immediate shipment.':'Lead time is '+(p.leadTime||'subject to confirmation')+'.')+'<br><br>This pricing reflects current market conditions. Please reach out with any questions.';
+  return {gpPct,gpDollars,totalValue,discountPct,gpPts,compPts,stockPts,discPts,valuePts,targetPts,notesPts,gpMsg,compMsg,stockMsg,discMsg,valueMsg,targetMsg,notesMsg,total,grade,passFail,flags,conservative,competitive,aggressive,recGP,conGP,aggGP,recReason,coaching,customerNote,sizeCategory,weHaveStock,weHavePartialStock,compHasStock,compNoStock,fairMarket,fairMarketGP,fairMarketReason,priceToWin,priceToWinGP,priceToWinReason,aggressiveWin,aggressiveWinGP,aggressiveWinReason};
 }
 
 function generateCoaching(ch, r) {
@@ -1032,11 +1140,23 @@ function renderScorecard(ch, r) {
     html+='<tr style="border-bottom:'+(i<arr.length-1?'1px solid #eee':'none')+'"><td style="padding:8px 4px;font-weight:600;white-space:nowrap">'+lbl+'</td><td style="text-align:right;font-weight:700;width:55px">'+pts+'/'+max+'</td><td style="padding:4px 10px;width:70px"><div style="background:#eee;border-radius:4px;height:8px"><div style="background:'+bar+';height:8px;border-radius:4px;width:'+Math.round(pct*100)+'%"></div></div></td><td style="padding:8px 4px;color:#555;font-size:12px">'+msg+'</td></tr>';
   });
   html+='</table></div></div>';
-  html+='<div class="card" style="margin-bottom:16px"><div class="card-header">Recommended Pricing</div><div class="card-body"><div style="font-size:13px;color:#555;margin-bottom:12px">'+r.recReason+'</div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">';
-  html+='<div style="background:#e8f5e9;border:2px solid var(--green);border-radius:8px;padding:12px;text-align:center"><div style="font-size:11px;color:var(--gray);text-transform:uppercase">Conservative</div><div style="font-size:22px;font-weight:900;color:var(--green-dark);font-family:monospace">'+fmt(r.conservative)+'</div><div style="font-size:12px;color:var(--gray)">'+r.conGP.toFixed(1)+'% GP</div></div>';
-  html+='<div style="background:#e3f2fd;border:2px solid #1565c0;border-radius:8px;padding:12px;text-align:center"><div style="font-size:11px;color:var(--gray);text-transform:uppercase">Competitive ★</div><div style="font-size:22px;font-weight:900;color:#1565c0;font-family:monospace">'+fmt(r.competitive)+'</div><div style="font-size:12px;color:var(--gray)">'+r.recGP.toFixed(1)+'% GP</div></div>';
-  html+='<div style="background:#fff8e1;border:2px solid var(--yellow);border-radius:8px;padding:12px;text-align:center"><div style="font-size:11px;color:var(--gray);text-transform:uppercase">Aggressive</div><div style="font-size:22px;font-weight:900;color:#7a5500;font-family:monospace">'+fmt(r.aggressive)+'</div><div style="font-size:12px;color:var(--gray)">'+r.aggGP.toFixed(1)+'% GP</div></div>';
-  html+='</div><div style="font-size:11px;color:var(--gray);margin-top:8px">Your price: <strong>'+fmt(ch.quotedPrice)+'</strong> · List: <strong>'+fmt(p.listPrice)+'</strong> · Cost: <strong>'+fmt(ch.cost)+'</strong></div></div></div>';
+  html+='<div class="card" style="margin-bottom:16px"><div class="card-header">Recommended Pricing</div><div class="card-body">';
+  if (ch.isSpecificPart) {
+    html+='<div style="font-size:12px;color:var(--gray);margin-bottom:12px">Firm goal: <strong>35% GP</strong> overall · Floor: <strong>15% GP</strong> — only breach the floor when it\'s required to <em>win</em> the business, not simply to avoid losing it.</div>';
+    html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">';
+    html+='<div style="background:#e3f2fd;border:2px solid #1565c0;border-radius:8px;padding:12px;text-align:center"><div style="font-size:11px;color:var(--gray);text-transform:uppercase">Fair Market Price</div><div style="font-size:22px;font-weight:900;color:#1565c0;font-family:monospace">'+fmt(r.fairMarket)+'</div><div style="font-size:12px;color:var(--gray)">'+r.fairMarketGP.toFixed(1)+'% GP</div></div>';
+    html+='<div style="background:#e8f5e9;border:2px solid var(--green);border-radius:8px;padding:12px;text-align:center"><div style="font-size:11px;color:var(--gray);text-transform:uppercase">Price to Win ★</div><div style="font-size:22px;font-weight:900;color:var(--green-dark);font-family:monospace">'+fmt(r.priceToWin)+'</div><div style="font-size:12px;color:var(--gray)">'+r.priceToWinGP.toFixed(1)+'% GP</div></div>';
+    html+='<div style="background:#fff8e1;border:2px solid var(--yellow);border-radius:8px;padding:12px;text-align:center"><div style="font-size:11px;color:var(--gray);text-transform:uppercase">Aggressive — Cannot Lose</div><div style="font-size:22px;font-weight:900;color:#7a5500;font-family:monospace">'+fmt(r.aggressiveWin)+'</div><div style="font-size:12px;color:var(--gray)">'+r.aggressiveWinGP.toFixed(1)+'% GP</div></div>';
+    html+='</div>';
+    html+='<div style="margin-top:10px;font-size:12px;line-height:1.6"><div style="margin-bottom:4px"><strong>Fair Market:</strong> '+r.fairMarketReason+'</div><div style="margin-bottom:4px"><strong>Price to Win:</strong> '+r.priceToWinReason+'</div><div><strong>Aggressive:</strong> '+r.aggressiveWinReason+'</div></div>';
+  } else {
+    html+='<div style="font-size:13px;color:#555;margin-bottom:12px">'+r.recReason+'</div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">';
+    html+='<div style="background:#e8f5e9;border:2px solid var(--green);border-radius:8px;padding:12px;text-align:center"><div style="font-size:11px;color:var(--gray);text-transform:uppercase">Conservative</div><div style="font-size:22px;font-weight:900;color:var(--green-dark);font-family:monospace">'+fmt(r.conservative)+'</div><div style="font-size:12px;color:var(--gray)">'+r.conGP.toFixed(1)+'% GP</div></div>';
+    html+='<div style="background:#e3f2fd;border:2px solid #1565c0;border-radius:8px;padding:12px;text-align:center"><div style="font-size:11px;color:var(--gray);text-transform:uppercase">Competitive ★</div><div style="font-size:22px;font-weight:900;color:#1565c0;font-family:monospace">'+fmt(r.competitive)+'</div><div style="font-size:12px;color:var(--gray)">'+r.recGP.toFixed(1)+'% GP</div></div>';
+    html+='<div style="background:#fff8e1;border:2px solid var(--yellow);border-radius:8px;padding:12px;text-align:center"><div style="font-size:11px;color:var(--gray);text-transform:uppercase">Aggressive</div><div style="font-size:22px;font-weight:900;color:#7a5500;font-family:monospace">'+fmt(r.aggressive)+'</div><div style="font-size:12px;color:var(--gray)">'+r.aggGP.toFixed(1)+'% GP</div></div>';
+    html+='</div>';
+  }
+  html+='<div style="font-size:11px;color:var(--gray);margin-top:8px">Your price: <strong>'+fmt(ch.quotedPrice)+'</strong> · List: <strong>'+fmt(p.listPrice)+'</strong> · Cost: <strong>'+fmt(ch.cost)+'</strong></div></div></div>';
   if(r.coaching) html+='<div class="card" style="margin-bottom:16px"><div class="card-header">Coaching</div><div class="card-body" style="font-size:13px;line-height:1.6">'+r.coaching+'</div></div>';
   html+='<div class="card" style="margin-bottom:16px"><div class="card-header">Customer Note Template</div><div class="card-body"><div style="background:#f4f6f9;border-radius:6px;padding:14px;font-size:13px;line-height:1.6">'+r.customerNote+'</div></div></div>';
   document.getElementById('scoreContent').innerHTML = html;
@@ -1077,6 +1197,143 @@ function startManagerReview() {
   html+='</tbody></table></div></div>';
   document.getElementById('managerContent').innerHTML=html;
   showScreen('screenManager');
+}
+
+/* ── SPECIFIC PART CHALLENGE ── */
+function generateCustomScenario() {
+  const pn = (document.getElementById('cpPartNumber').value||'').trim();
+  const lp = parseFloat(document.getElementById('cpListPrice').value);
+  const qty = parseInt(document.getElementById('cpQty').value);
+  const mfr = (document.getElementById('cpManufacturer').value||'').trim();
+  const stockVal = document.getElementById('cpStock').value;
+  const stock = stockVal !== '' ? (parseInt(stockVal)||0) : null;
+  const errEl = document.getElementById('cpError');
+  errEl.innerHTML = '';
+  const eStyle = 'background:rgba(220,53,69,0.2);border:1px solid rgba(220,53,69,0.5);border-radius:6px;padding:8px 12px;font-size:13px;margin-top:8px';
+  if (!pn) { errEl.innerHTML='<div style="'+eStyle+'">Please enter a part number.</div>'; return; }
+  if (isNaN(lp)||lp<=0) { errEl.innerHTML='<div style="'+eStyle+'">Please enter a valid list price.</div>'; return; }
+  if (isNaN(qty)||qty<1) { errEl.innerHTML='<div style="'+eStyle+'">Please enter a valid quantity.</div>'; return; }
+
+  const catalogPart = state.catalog.find(p => p.partNumber.toUpperCase() === pn.toUpperCase());
+  let part;
+  if (catalogPart) {
+    part = Object.assign({}, catalogPart);
+    part.listPrice = lp;
+    if (stock !== null) part.inStock = stock;
+    if (mfr) part.manufacturer = mfr;
+  } else {
+    part = { partNumber:pn, description:'', manufacturer:mfr, listPrice:lp, inStock:stock!==null?stock:0, leadTime:'', category:'', notes:stock===null?'⚠ Stock not provided — scoring assumes 0 on hand.':'' };
+  }
+
+  const moq = getMOQ(part);
+  const belowMOQ = qty < moq;
+  let targetPrice = null;
+  const r2 = Math.random();
+  if (r2<0.25) targetPrice = +(lp*(0.88+Math.random()*0.08)).toFixed(4);
+  else if (r2<0.50) targetPrice = +(lp*(0.72+Math.random()*0.12)).toFixed(4);
+  else if (r2<0.65) targetPrice = +(lp*(0.50+Math.random()*0.15)).toFixed(4);
+
+  state.currentChallenge = { part, qty, moq, belowMOQ, scenario:rnd(SCENARIOS), targetPrice, submitted:false, isSpecificPart:true };
+  const ch = state.currentChallenge;
+
+  const moqAlert = belowMOQ
+    ? '<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:12px 16px;margin-bottom:12px;font-size:13px"><strong>⚠ Below MOQ:</strong> Qty <strong>'+qty.toLocaleString()+'</strong> is below MOQ of <strong>'+moq.toLocaleString()+'</strong>. Use Cannot Quote to handle this properly.</div>'
+    : '';
+  document.getElementById('cpScenarioBox').innerHTML = moqAlert +
+    '<div class="scenario-box"><strong>Scenario:</strong> ' + ch.scenario +
+    (targetPrice ? '<br><br><strong>Customer Target: '+fmt(targetPrice)+'/unit</strong> — They indicated this is their budget.' : '') + '</div>';
+
+  const tpUrl = 'https://www.trustedparts.com/en/search/'+encodeURIComponent(pn);
+  document.getElementById('cpTPPanel').innerHTML =
+    '<div class="tp-panel"><h4>🔗 Competitive Pricing — TrustedParts.com</h4>' +
+    '<p style="font-size:13px;margin-bottom:8px">Look up this part and enter the lowest <strong>authorized distributor</strong> price at qty <strong>'+qty.toLocaleString()+'</strong>.</p>' +
+    '<a href="'+tpUrl+'" target="_blank" class="btn btn-sm btn-teal">Open TrustedParts ↗</a></div>';
+
+  ['cpCost','cpPrice','cpCompPrice','cpCompSource','cpNotes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('cpTargetPrice').value = targetPrice || '';
+  document.getElementById('cpCompStock').value = 'unknown';
+  document.getElementById('cpLiveGPPanel').style.display = 'none';
+  document.getElementById('cpCannotQuotePanel').style.display = 'none';
+  document.getElementById('cpCqReason').value = '';
+  document.getElementById('cpSubmitError').className = 'hidden';
+  ['cpCqMoqBlock','cpCqNoStockBlock'].forEach(id=>document.getElementById(id).style.display='none');
+
+  document.getElementById('cpScenarioSection').style.display = '';
+  setTimeout(()=>document.getElementById('cpScenarioSection').scrollIntoView({behavior:'smooth',block:'start'}),100);
+}
+
+function updateCPLiveGP() {
+  const cost = parseFloat(document.getElementById('cpCost').value);
+  const price = parseFloat(document.getElementById('cpPrice').value);
+  const ch = state.currentChallenge;
+  if (!ch||isNaN(cost)||cost<=0){document.getElementById('cpLiveGPPanel').style.display='none';return;}
+  document.getElementById('cpLiveGPPanel').style.display='';
+  const cfg=state.config, lp=ch.part.listPrice, qty=ch.qty;
+  const gpList=(lp-cost)/lp*100;
+  setGPTile('cpGpTileList','cpGpListVal','cpGpListSub',gpList.toFixed(1)+'%',gpList>=cfg.targetGP?'✓ At target':gpList>=cfg.minGP?'↓ Below target':'⚠ Below floor',gpList,cfg);
+  if(!isNaN(price)&&price>0){
+    const gpQ=(price-cost)/price*100, gpD=(price-cost)*qty, disc=(lp-price)/lp*100;
+    setGPTile('cpGpTileQuote','cpGpQuoteVal','cpGpQuoteSub',gpQ.toFixed(1)+'%',price<cost?'🚨 Below cost!':gpQ>=cfg.targetGP?'✓ At target':gpQ>=cfg.minGP?'↓ Below target':'⚠ Below floor',price<cost?-1:gpQ,cfg);
+    document.getElementById('cpGpDollarsVal').textContent='$'+gpD.toFixed(2);
+    document.getElementById('cpGpDollarsSub').textContent=qty.toLocaleString()+' units · '+disc.toFixed(1)+'% off list';
+    document.getElementById('cpGpTileDollars').style.background='#f4f6f9';
+    document.getElementById('cpGpTileDollars').querySelector('.gp-val').style.color=gpD>=0?'var(--navy)':'var(--red)';
+  } else {
+    document.getElementById('cpGpQuoteVal').textContent='—';document.getElementById('cpGpQuoteSub').textContent='Enter price above';resetGPTile('cpGpTileQuote');
+    document.getElementById('cpGpDollarsVal').textContent='—';document.getElementById('cpGpDollarsSub').textContent='';resetGPTile('cpGpTileDollars');
+  }
+}
+
+function submitCPQuote() {
+  const cost=parseFloat(document.getElementById('cpCost').value);
+  const price=parseFloat(document.getElementById('cpPrice').value);
+  const errEl=document.getElementById('cpSubmitError');
+  if(isNaN(cost)||cost<=0){errEl.innerHTML='<div class="alert alert-danger">Please enter a valid cost.</div>';errEl.className='';return;}
+  if(isNaN(price)||price<=0){errEl.innerHTML='<div class="alert alert-danger">Please enter a valid quote price.</div>';errEl.className='';return;}
+  errEl.className='hidden';
+  const ch=state.currentChallenge;
+  ch.cost=cost;ch.quotedPrice=price;
+  ch.targetPrice=parseFloat(document.getElementById('cpTargetPrice').value)||null;
+  ch.compPrice=parseFloat(document.getElementById('cpCompPrice').value)||null;
+  ch.compStock=document.getElementById('cpCompStock').value;
+  ch.compSource=document.getElementById('cpCompSource').value.trim();
+  ch.notes=document.getElementById('cpNotes').value.trim();
+  ch.submitted=true;ch.result=scoreQuote(ch);
+  state.sessionHistory.push(ch);updateHeaderScore();renderScorecard(ch,ch.result);showScreen('screenScore');
+}
+
+function showCPCannotQuote() {
+  const ch=state.currentChallenge;
+  document.getElementById('cpCannotQuotePanel').style.display='';
+  if(ch.belowMOQ&&!document.getElementById('cpCqReason').value){document.getElementById('cpCqReason').value='below_moq';document.getElementById('cpCqMoqQty').value=ch.moq;updateCPCQFields();}
+  else if(ch.part.inStock===0&&!document.getElementById('cpCqReason').value){document.getElementById('cpCqReason').value='no_stock';updateCPCQFields();}
+  document.getElementById('cpCannotQuotePanel').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function hideCPCannotQuote(){document.getElementById('cpCannotQuotePanel').style.display='none';}
+function updateCPCQFields(){
+  const r=document.getElementById('cpCqReason').value;
+  document.getElementById('cpCqMoqBlock').style.display=r==='below_moq'?'':'none';
+  document.getElementById('cpCqNoStockBlock').style.display=r==='no_stock'?'':'none';
+}
+function submitCPCannotQuote(){
+  const ch=state.currentChallenge;
+  const reason=document.getElementById('cpCqReason').value;
+  const errEl=document.getElementById('cpCqError');errEl.style.display='none';
+  if(!reason){errEl.textContent='Please select a reason.';errEl.style.display='';return;}
+  const moqQty=parseInt(document.getElementById('cpCqMoqQty').value)||0;
+  const leadTime=(document.getElementById('cpCqLeadTime').value||document.getElementById('cpCqLeadTimeNS').value||'').trim();
+  const notes=document.getElementById('cpCqNotes').value.trim();
+  const noteWords=notes.split(/\s+/).filter(w=>w).length;
+  const p=ch.part;let score=0,flags=[],wells=[];
+  let rPts=0;if(ch.belowMOQ&&reason==='below_moq'){rPts=25;wells.push('correctly identified the Below MOQ issue');}else if(!ch.belowMOQ&&p.inStock===0&&reason==='no_stock'){rPts=25;wells.push('correctly identified a no-stock situation');}else if(ch.belowMOQ&&reason!=='below_moq'){rPts=5;flags.push({type:'yellow',msg:'⚠️ Wrong reason — real issue was Below MOQ.'});}else{rPts=15;}score+=rPts;
+  let mPts=0;if(reason==='below_moq'){if(!moqQty){mPts=0;flags.push({type:'red',msg:'🚨 Missing: no MOQ quantity offered to customer.'});}else if(ch.belowMOQ&&Math.abs(moqQty-ch.moq)/ch.moq<=0.10){mPts=30;wells.push('proposed the correct MOQ quantity ('+moqQty.toLocaleString()+' pcs)');}else if(moqQty>=ch.moq){mPts=20;}else{mPts=10;flags.push({type:'red',msg:'🚨 Proposed qty still below MOQ.'});}}else{mPts=30;}score+=mPts;
+  let lPts=0;if(reason==='below_moq'||reason==='no_stock'){if(!leadTime){lPts=0;flags.push({type:'red',msg:'🚨 No lead time provided — critical for factory orders.'});}else if(leadTime.length<5){lPts=10;}else{lPts=25;wells.push('provided lead time estimate');}}else{lPts=25;}score+=lPts;
+  let nPts=0;if(!noteWords){nPts=0;flags.push({type:'red',msg:'🚨 No customer explanation written.'});}else if(noteWords<10){nPts=8;}else if(noteWords<25){nPts=14;}else{nPts=20;wells.push('wrote a thorough customer explanation');}score+=nPts;
+  const grade=score>=90?'A':score>=80?'B':score>=70?'C':score>=60?'D':'F';
+  const passFail=score>=70?'pass':'fail';
+  const result={type:'cannot_quote',reason,moqQty,leadTime,notes,score,grade,passFail,flags,coaching:buildCNQCoaching(wells,reason,mPts,lPts,nPts,ch,grade)};
+  ch.submitted=true;ch.cannotQuoteResult=result;
+  state.sessionHistory.push(ch);updateHeaderScore();renderCNQScore(ch,result);showScreen('screenScore');
 }
 
 /* ── CONFIG ── */
